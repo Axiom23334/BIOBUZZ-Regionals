@@ -22,7 +22,7 @@ public class diffyCode extends LinearOpMode{
         double error = targetAngle - currentAngle;
 
         double speed = 0;
-        double power=0;
+        double power;
         if (Math.abs(error) > 0.1) {
             motor1.setPower(Range.clip(-error * 0.5, -1, 1));
             motor2.setPower(Range.clip(error * 0.5, -1, 1));
