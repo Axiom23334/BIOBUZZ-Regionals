@@ -47,5 +47,12 @@ dependencies {
     implementation project(':FtcRobotController')
     implementation("com.acmerobotics.slothboard:dashboard:0.2.4+0.5.1")
     implementation("com.bylazar.sloth:fullpanels:0.2.4+1.0.12")
+    implementation "org.solverslib:core:0.3.4" // core
+    implementation "org.solverslib:pedroPathing:0.3.4" // pedroPathing
+
+    // Pedro Pathing
+    implementation 'com.pedropathing:ftc:2.1.2'
+    implementation 'com.pedropathing:telemetry:1.0.0'
+
 
 }

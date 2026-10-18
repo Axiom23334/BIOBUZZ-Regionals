@@ -18,6 +18,7 @@ public class clear extends LinearOpMode{
         while (opModeIsActive()){
 
             leftMotor1.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+            leftMotor2.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
 
         }
 
