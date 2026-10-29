@@ -16,16 +16,18 @@ import com.seattlesolvers.solverslib.util.TelemetryData;
 import org.firstinspires.ftc.teamcode.commands.IntakeFlipperCommand;
 import org.firstinspires.ftc.teamcode.commands.StateMachineCommand;
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
+import org.firstinspires.ftc.teamcode.subsystems.DiffyDriveSubsystem;
 import org.firstinspires.ftc.teamcode.subsystems.FlipperSubsystem;
 import org.firstinspires.ftc.teamcode.subsystems.MechanismSubsystem;
 
-@Autonomous(name = "New SolversLib Auto", group = "Autonomous")
+@Autonomous(name = "Regionals Autonomous", group = "Autonomous")
 public class NewCommandAuto extends CommandOpMode {
 
     private Follower follower;
     private TelemetryData telemetryData;
 
     // Subsystems
+    private DiffyDriveSubsystem driveSubsystem;
     private MechanismSubsystem mechanismSubsystem;
     private FlipperSubsystem flipperSubsystem;
     private StateMachineCommand stateMachineCommand;
@@ -45,7 +47,11 @@ public class NewCommandAuto extends CommandOpMode {
     public void initialize() {
         super.reset();
 
-        follower = Constants.createFollower(hardwareMap);
+        // 1. Setup Diffy Drivebase subsystem (same hardware and math as diffyCode)
+        driveSubsystem = new DiffyDriveSubsystem(hardwareMap);
+
+        // 2. Initialize Follower using the Diffy Drivetrain
+        follower = Constants.createFollower(hardwareMap, driveSubsystem);
         follower.setStartingPose(startPose);
         telemetryData = new TelemetryData(telemetry);
 
@@ -99,6 +105,8 @@ public class NewCommandAuto extends CommandOpMode {
             double rpm = (shooterMotor.getVelocity() * 60.0) / MechanismSubsystem.SHOOTER_TICKS_PER_REV;
             telemetryData.addData("Shooter RPM", String.format("%.0f / 3500", rpm));
         }
+        telemetryData.addData("Diffy 1 Ready", driveSubsystem.diffy1Ready);
+        telemetryData.addData("Diffy 2 Ready", driveSubsystem.diffy2Ready);
         telemetryData.addData("Follower Busy", follower.isBusy());
         telemetryData.addData("X", follower.getPose().getX());
         telemetryData.addData("Y", follower.getPose().getY());

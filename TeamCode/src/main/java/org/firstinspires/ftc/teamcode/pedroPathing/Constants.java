@@ -6,6 +6,8 @@ import com.pedropathing.ftc.FollowerBuilder;
 import com.pedropathing.paths.PathConstraints;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 
+import org.firstinspires.ftc.teamcode.subsystems.DiffyDriveSubsystem;
+
 public class Constants {
     public static FollowerConstants followerConstants = new FollowerConstants();
 
@@ -14,6 +16,14 @@ public class Constants {
     public static Follower createFollower(HardwareMap hardwareMap) {
         return new FollowerBuilder(followerConstants, hardwareMap)
                 .pathConstraints(pathConstraints)
+                .setDrivetrain(new DiffyPedroDrivetrain(hardwareMap))
+                .build();
+    }
+
+    public static Follower createFollower(HardwareMap hardwareMap, DiffyDriveSubsystem diffyDrive) {
+        return new FollowerBuilder(followerConstants, hardwareMap)
+                .pathConstraints(pathConstraints)
+                .setDrivetrain(new DiffyPedroDrivetrain(diffyDrive))
                 .build();
     }
 }
