@@ -57,8 +57,6 @@ public class diffyCode extends LinearOpMode{
         packet.put("Error", error);
         packet.put("speed", power);
         packet.put("y", y);
-        packet.put("1", diffy1Ready);
-        packet.put("2", diffy2Ready);
         dashboard.sendTelemetryPacket(packet);
     }
 

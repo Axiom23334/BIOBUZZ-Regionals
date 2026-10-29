@@ -8,7 +8,7 @@ public class SwerveTeleOpConfig {
     // =========================================================
     // 1. PID COEFFICIENTS (Edit these live to tune holding power)
     // =========================================================
-    public static double Kp = 0.08;
+    public static double Kp = 0.06;
     public static double Kd = 0.0;
     public static double Ki = 0; // Usually 0 for drive modules
     public static double Kf = 0;
@@ -25,9 +25,9 @@ public class SwerveTeleOpConfig {
     // =========================================================
     // 3. DRIVER PREFERENCES
     // =========================================================
-    public static double DRIVE_SPEED_SCALAR = 0.8;
+    public static double DRIVE_SPEED_SCALAR = 1.0;
     public static double ROTATION_SPEED_SCALAR = 0.8;
-    public static boolean FIELD_CENTRIC = true;
+    public static boolean FIELD_CENTRIC = false;
     public static boolean USE_IMU = false;
 
     // Set to -1 if rotating the robot clockwise makes heading DECREASE

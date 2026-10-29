@@ -49,7 +49,7 @@ public class SwerveTeleOp extends LinearOpMode {
             double rotScale = SwerveTeleOpConfig.ROTATION_SPEED_SCALAR;
 
             double strafe = gamepad1.left_stick_x * driveScale;
-            double forward = gamepad1.left_stick_y * driveScale;
+            double forward = -gamepad1.left_stick_y * driveScale;
 
 
             double rot = -gamepad1.right_stick_x * rotScale;
