@@ -5,10 +5,11 @@ import com.qualcomm.robotcore.hardware.Servo;
 import com.seattlesolvers.solverslib.command.SubsystemBase;
 
 public class FlipperSubsystem extends SubsystemBase {
+    public static final double INTAKE_POSITION = 0.5;
     private Servo flipperServo;
 
-    public static double INTAKE_POSITION = 1.0;
-    public static double REST_POSITION = 0.0;
+    public static double DOWN_POSITION = 0.0;
+    public static double UP_POSITION = 1.0;
 
     public FlipperSubsystem(HardwareMap hardwareMap) {
         try {
@@ -24,11 +25,11 @@ public class FlipperSubsystem extends SubsystemBase {
         }
     }
 
-    public void flipperIntake() {
-        setPosition(INTAKE_POSITION);
+    public void flipperDown() {
+        setPosition(DOWN_POSITION);
     }
 
-    public void flipperRest() {
-        setPosition(REST_POSITION);
+    public void flipperUp() {
+        setPosition(UP_POSITION);
     }
 }

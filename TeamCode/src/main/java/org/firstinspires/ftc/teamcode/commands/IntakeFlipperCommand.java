@@ -4,8 +4,8 @@ import com.seattlesolvers.solverslib.command.CommandBase;
 import org.firstinspires.ftc.teamcode.subsystems.FlipperSubsystem;
 
 public class IntakeFlipperCommand extends CommandBase {
-    private final FlipperSubsystem flipperSubsystem;
-    private final double targetPosition;
+    private FlipperSubsystem flipperSubsystem;
+    private double targetPosition = 0;
 
     public IntakeFlipperCommand(FlipperSubsystem flipperSubsystem) {
         this(flipperSubsystem, FlipperSubsystem.INTAKE_POSITION);
