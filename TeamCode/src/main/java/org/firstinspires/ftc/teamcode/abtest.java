@@ -13,7 +13,7 @@ import com.qualcomm.robotcore.hardware.CRServo;
  * NOTE: The names "left" and "right" below must exactly match the names
  * you gave these servos in your robot configuration file on the Driver Station.
  */
-@TeleOp(name = "Concept: Scan Servo", group = "Concept")
+@TeleOp(name = "Concept: Scan Servo", group = "Utility")
 public class abtest extends LinearOpMode {
 
     // Define class members

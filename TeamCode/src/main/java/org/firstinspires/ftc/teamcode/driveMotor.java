@@ -9,7 +9,7 @@ import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 @Config
-@TeleOp(name = "driveMotor")
+@TeleOp(name="Utility: Drive Motor", group = "Utility")
 public class driveMotor extends LinearOpMode {
 
     @Override

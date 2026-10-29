@@ -5,7 +5,9 @@ import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 
-@TeleOp
+@Deprecated
+@TeleOp(name="Deprecated: Strafer", group = "Utility")
+
 public class strafer extends LinearOpMode {
     @Override
     public void runOpMode() throws InterruptedException {

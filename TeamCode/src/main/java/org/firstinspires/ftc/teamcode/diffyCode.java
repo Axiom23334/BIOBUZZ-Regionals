@@ -7,7 +7,7 @@ import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.util.Range;
 @Config
-@TeleOp
+@TeleOp(name="Utility: Diffy Code", group = "Utility")
 public class diffyCode extends LinearOpMode{
     public static double kP1 = 0.7;
     public static double kP2 = 0.7;
