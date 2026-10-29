@@ -6,17 +6,13 @@ import com.seattlesolvers.solverslib.command.SubsystemBase;
 
 public class FlipperSubsystem extends SubsystemBase {
     public static final double INTAKE_POSITION = 0.5;
-    private Servo flipperServo;
+    private final Servo flipperServo;
 
     public static double DOWN_POSITION = 0.0;
     public static double UP_POSITION = 1.0;
 
     public FlipperSubsystem(HardwareMap hardwareMap) {
-        try {
-            flipperServo = hardwareMap.get(Servo.class, "flipper");
-        } catch (Exception e) {
-            flipperServo = null;
-        }
+        flipperServo = hardwareMap.get(Servo.class, "flipper");
     }
 
     public void setPosition(double position) {

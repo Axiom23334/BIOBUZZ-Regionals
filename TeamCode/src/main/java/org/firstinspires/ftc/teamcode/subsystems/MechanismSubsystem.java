@@ -7,20 +7,20 @@ import com.seattlesolvers.solverslib.command.SubsystemBase;
 import com.seattlesolvers.solverslib.controller.PIDFController;
 
 public class MechanismSubsystem extends SubsystemBase {
-    private DcMotorEx turretMotor;
-    private DcMotorEx intakeMotor;
-    private DcMotorEx transferMotor;
-    private DcMotorEx shooterMotor;
+    private final DcMotorEx turretMotor;
+    private final DcMotorEx intakeMotor;
+    private final DcMotorEx transferMotor;
+    private final DcMotorEx shooterMotor;
 
     // PID Controller for 3500 RPM shooter control
     private final PIDFController shooterPid = new PIDFController(0.0008, 0.00005, 0.00001, 0.00025);
     public static double SHOOTER_TICKS_PER_REV = 28.0;
 
     public MechanismSubsystem(HardwareMap hardwareMap) {
-        try { turretMotor = hardwareMap.get(DcMotorEx.class, "turretMotor"); } catch (Exception ignored) {}
-        try { intakeMotor = hardwareMap.get(DcMotorEx.class, "intakeMotor"); } catch (Exception ignored) {}
-        try { transferMotor = hardwareMap.get(DcMotorEx.class, "transferMotor"); } catch (Exception ignored) {}
-        try { shooterMotor = hardwareMap.get(DcMotorEx.class, "shooterMotor"); } catch (Exception ignored) {}
+        turretMotor = hardwareMap.get(DcMotorEx.class, "turretMotor");
+        intakeMotor = hardwareMap.get(DcMotorEx.class, "intakeMotor");
+        transferMotor = hardwareMap.get(DcMotorEx.class, "transferMotor");
+        shooterMotor = hardwareMap.get(DcMotorEx.class, "shooterMotor");
     }
 
     public void runIntakeOnly() {
