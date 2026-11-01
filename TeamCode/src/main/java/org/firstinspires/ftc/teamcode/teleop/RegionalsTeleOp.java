@@ -98,7 +98,7 @@ public class RegionalsTeleOp extends LinearOpMode {
 
         // Init Subsystems
         SwerveDrive swerve = new SwerveDrive(telemetry, hardwareMap);
-        GoBildaPinpointDriver odo = hardwareMap.get(GoBildaPinpointDriver.class, "odo");
+        GoBildaPinpointDriver odo = hardwareMap.get(GoBildaPinpointDriver.class, "pin");
         odo.setOffsets(-170.5, 42.023);
         odo.setEncoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD);
         odo.setEncoderDirections(GoBildaPinpointDriver.EncoderDirection.FORWARD,
