@@ -98,12 +98,12 @@ public class RegionalsTeleOp extends LinearOpMode {
 
         // Init Subsystems
         SwerveDrive swerve = new SwerveDrive(telemetry, hardwareMap);
-        GoBildaPinpointDriver odo = hardwareMap.get(GoBildaPinpointDriver.class, "pin");
-        odo.setOffsets(-170.5, 42.023);
-        odo.setEncoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD);
-        odo.setEncoderDirections(GoBildaPinpointDriver.EncoderDirection.FORWARD,
+        GoBildaPinpointDriver pin = hardwareMap.get(GoBildaPinpointDriver.class, "pin");
+        pin.setOffsets(-170.5, 42.023);
+        pin.setEncoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD);
+        pin.setEncoderDirections(GoBildaPinpointDriver.EncoderDirection.FORWARD,
                 GoBildaPinpointDriver.EncoderDirection.REVERSED);
-        swerve.updateOdo(odo);
+        swerve.updatePin(pin);
         // Shooting Status
 
 
@@ -131,7 +131,7 @@ public class RegionalsTeleOp extends LinearOpMode {
 
         // Initialize Dedicated Turret Tracker (tracks vision & seamlessly falls back to Pinpoint heading)
         turretTracker = new TurretTracker(hardwareMap);
-        turretTracker.setOdo(odo);
+        turretTracker.setPin(pin);
 
         transferMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
@@ -156,11 +156,12 @@ public class RegionalsTeleOp extends LinearOpMode {
             packet.put("y", pixelY);
             packet.put("pos", turretTracker.getTurretPosition());
             packet.put("turretPower", turretPower);
-            packet.put("pinpointAssisted", turretTracker.isPinpointAssisted());
+            packet.put("trackerState", turretTracker.getTrackerState());
             dashboard.sendTelemetryPacket(packet);
 
             telemetry.addData("Turret Pos", "%.0f", turretTracker.getTurretPosition());
-            telemetry.addData("Turret Mode", turretTracker.isPinpointAssisted() ? "PINPOINT_HEADING" : (turretTracker.isTracking() ? "VISION" : "IDLE"));
+            telemetry.addData("Turret Mode", turretTracker.getTrackerState());
+            telemetry.addData("Chassis Yaw Rate", "%.1f deg/s", turretTracker.getBotYawRateDegSec());
 
             // Manual base pitch adjustments
             if (gamepad1.a){
@@ -230,7 +231,7 @@ public class RegionalsTeleOp extends LinearOpMode {
                     transferMotor.setPower(1.0);
                     break;
             }
-            odo.update(GoBildaPinpointDriver.readData.ONLY_UPDATE_HEADING);
+            pin.update(GoBildaPinpointDriver.readData.ONLY_UPDATE_HEADING);
 
             // 1. Inputs
             double driveScale = SwerveTeleOpConfig.DRIVE_SPEED_SCALAR;
@@ -291,8 +292,8 @@ public class RegionalsTeleOp extends LinearOpMode {
                 .setNumThreads(4)                                      // Parallel processing for fast detection
                 .build();
 
-        // Set decimation to 2.0f for higher speed and range accuracy
-        aprilTag.setDecimation(2.0f);
+        // Set decimation to 1.0f (full resolution) for maximum detection range on distant AprilTags
+        aprilTag.setDecimation(1.0f);
 
         VisionPortal.Builder builder = new VisionPortal.Builder();
 

@@ -22,12 +22,12 @@ public class SwerveTeleOp extends LinearOpMode {
 
         // Init Subsystems
         SwerveDrive swerve = new SwerveDrive(telemetry, hardwareMap);
-        GoBildaPinpointDriver odo = hardwareMap.get(GoBildaPinpointDriver.class, "odo");
-        odo.setOffsets(-170.5, 42.023);
-        odo.setEncoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD);
-        odo.setEncoderDirections(GoBildaPinpointDriver.EncoderDirection.FORWARD,
+        GoBildaPinpointDriver pin = hardwareMap.get(GoBildaPinpointDriver.class, "pin");
+        pin.setOffsets(-170.5, 42.023);
+        pin.setEncoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD);
+        pin.setEncoderDirections(GoBildaPinpointDriver.EncoderDirection.FORWARD,
                 GoBildaPinpointDriver.EncoderDirection.REVERSED);
-        swerve.updateOdo(odo);
+        swerve.updatePin(pin);
         // Shooting Status
 
 
@@ -43,7 +43,7 @@ public class SwerveTeleOp extends LinearOpMode {
 
         while (opModeIsActive()) {
 
-            odo.update(GoBildaPinpointDriver.readData.ONLY_UPDATE_HEADING);
+            pin.update(GoBildaPinpointDriver.readData.ONLY_UPDATE_HEADING);
 
             // 1. Inputs
             double driveScale = SwerveTeleOpConfig.DRIVE_SPEED_SCALAR;

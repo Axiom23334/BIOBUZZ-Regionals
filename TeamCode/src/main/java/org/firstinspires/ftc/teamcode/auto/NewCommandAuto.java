@@ -75,8 +75,8 @@ public class NewCommandAuto extends LinearOpMode {
         // Initialize Turret Tracker with Pinpoint IMU (heading-only, pods not required)
         turretTracker = new TurretTracker(hardwareMap);
         try {
-            GoBildaPinpointDriver odo = hardwareMap.get(GoBildaPinpointDriver.class, "odo");
-            turretTracker.setOdo(odo);
+            GoBildaPinpointDriver pin = hardwareMap.get(GoBildaPinpointDriver.class, "pin");
+            turretTracker.setPin(pin);
         } catch (Exception ignored) {}
 
         // Initialize AprilTag vision for target detection during auto
@@ -155,7 +155,7 @@ public class NewCommandAuto extends LinearOpMode {
                 .setLensIntrinsics(578.272, 578.272, 402.145, 221.506)
                 .setNumThreads(4)
                 .build();
-        aprilTag.setDecimation(2.0f);
+        aprilTag.setDecimation(1.0f);
 
         visionPortal = new VisionPortal.Builder()
                 .setCamera(hardwareMap.get(WebcamName.class, "Webcam 1"))

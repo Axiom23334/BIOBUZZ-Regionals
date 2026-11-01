@@ -20,7 +20,7 @@ import org.firstinspires.ftc.teamcode.utility.myDcMotorEx;
 
 public class SwerveDrive {
 
-    private GoBildaPinpointDriver odo;
+    private GoBildaPinpointDriver pin;
     private final myDcMotorEx mod1m1, mod1m2, mod2m1, mod2m2;
     private Telemetry telemetry;
 
@@ -94,11 +94,11 @@ public class SwerveDrive {
 
         HEADING_LOCK_DEADBAND = SwerveTeleOpConfig.HEADING_LOCK_DEADBAND;
 
-        if (odo != null) {
-            odo.update(GoBildaPinpointDriver.readData.ONLY_UPDATE_HEADING);
+        if (pin != null) {
+            pin.update(GoBildaPinpointDriver.readData.ONLY_UPDATE_HEADING);
             // Auto-zero IMU once at startup using the same math as getHeading(), so heading reads 0 at startup.
             if (!imuZeroed) {
-                double rawDeg = Math.toDegrees(odo.getHeading(AngleUnit.RADIANS));
+                double rawDeg = Math.toDegrees(pin.getHeading(AngleUnit.RADIANS));
                 imuOffset = rawDeg * SwerveTeleOpConfig.IMU_POLARITY - SwerveTeleOpConfig.HEADING_FRAME_OFFSET_DEG;
                 imuZeroed = true;
             }
@@ -119,7 +119,7 @@ public class SwerveDrive {
         double heading = 0;
         boolean needsHeading = fieldCentric || (initialized && Math.abs(rot) < HEADING_LOCK_DEADBAND);
         if (needsHeading) {
-            if (odo == null) {
+            if (pin == null) {
                 heading = lastGoodHeading;
                 telemetry.addData("WARNING", "IMU UNAVAILABLE - USING FALLBACK");
             } else {
@@ -136,7 +136,7 @@ public class SwerveDrive {
         }
 
         double headingCorrection = 0;
-        if (needsHeading && odo != null) {
+        if (needsHeading && pin != null) {
             // First-time capture after init/reset so we don't drive toward 0 by default
             if (!headingTargetSet) {
                 headingTarget = heading;
@@ -227,13 +227,13 @@ public class SwerveDrive {
     }
 
     private double getHeading(double polarity) {
-        double headingDeg = Math.toDegrees(odo.getHeading(AngleUnit.RADIANS));
+        double headingDeg = Math.toDegrees(pin.getHeading(AngleUnit.RADIANS));
         return AngleUnit.normalizeDegrees(headingDeg * polarity - imuOffset - SwerveTeleOpConfig.HEADING_FRAME_OFFSET_DEG);
     }
 
     public void resetIMU() {
-        if (odo != null) {
-            double rawDeg = Math.toDegrees(odo.getHeading(AngleUnit.RADIANS));
+        if (pin != null) {
+            double rawDeg = Math.toDegrees(pin.getHeading(AngleUnit.RADIANS));
             imuOffset = rawDeg * SwerveTeleOpConfig.IMU_POLARITY - SwerveTeleOpConfig.HEADING_FRAME_OFFSET_DEG;
         }
         headingTarget = Math.PI;
@@ -284,7 +284,11 @@ public class SwerveDrive {
         telemetry = telem;
     }
 
-    public void updateOdo(GoBildaPinpointDriver odom){
-        odo = odom;
+    public void updatePin(GoBildaPinpointDriver pin){
+        this.pin = pin;
+    }
+
+    public void updateOdo(GoBildaPinpointDriver pin){
+        updatePin(pin);
     }
 }

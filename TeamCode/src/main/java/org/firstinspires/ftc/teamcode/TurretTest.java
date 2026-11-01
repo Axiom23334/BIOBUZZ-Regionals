@@ -27,7 +27,7 @@ public class TurretTest extends LinearOpMode {
 
     // Hardware
     private DcMotorEx turretMotor;
-    private GoBildaPinpointDriver odo;
+    private GoBildaPinpointDriver pin;
 
     // Vision & Tracker
     private AprilTagProcessor aprilTag;
@@ -47,15 +47,15 @@ public class TurretTest extends LinearOpMode {
 
         // Initialize Pinpoint driver if present
         try {
-            odo = hardwareMap.get(GoBildaPinpointDriver.class, "odo");
+            pin = hardwareMap.get(GoBildaPinpointDriver.class, "pin");
         } catch (Exception e) {
-            odo = null;
+            pin = null;
         }
 
         // Initialize TurretTracker
         turretTracker = new TurretTracker(hardwareMap);
-        if (odo != null) {
-            turretTracker.setOdo(odo);
+        if (pin != null) {
+            turretTracker.setPin(pin);
         }
 
         // Initialize AprilTag Vision
@@ -86,14 +86,15 @@ public class TurretTest extends LinearOpMode {
 
             // Telemetry Output
             telemetry.addLine("===== AUTOMATIC TURRET TRACKING =====");
-            telemetry.addData("Tracker State", turretTracker.isPinpointAssisted() ? "PINPOINT_HEADING" : (turretTracker.isTracking() ? "VISION" : "SEARCHING / IDLE"));
+            telemetry.addData("Tracker State", turretTracker.getTrackerState());
             telemetry.addData("Turret Position", "%.1f ticks", currentTicks);
             telemetry.addData("Applied Power", "%.3f", appliedPower);
             telemetry.addData("Motor Velocity", "%.1f ticks/s", turretMotor.getVelocity());
 
             telemetry.addLine("\n===== VISION & BOT ROTATION =====");
-            telemetry.addData("AprilTag Error X", pixelErrorX != -99999 ? String.format(Locale.US, "%.1f px", pixelErrorX) : "NO TAG");
-            telemetry.addData("Pinpoint Bot Heading", "%.1f deg", turretTracker.updateHeadingFromPinpoint());
+            telemetry.addData("AprilTag Raw Error X", pixelErrorX != -99999 ? String.format(Locale.US, "%.1f px", pixelErrorX) : "NO TAG");
+            telemetry.addData("Filtered Pixel Error", "%.1f px", turretTracker.getFilteredPixelError());
+            telemetry.addData("Pinpoint Yaw Rate", "%.1f deg/s", turretTracker.getBotYawRateDegSec());
             telemetry.addData("Target World Heading", "%.1f deg", turretTracker.getTargetTurretHeading());
 
             // Send Dashboard Plotting Packet
@@ -119,7 +120,7 @@ public class TurretTest extends LinearOpMode {
                     .setLensIntrinsics(578.272, 578.272, 402.145, 221.506)
                     .setNumThreads(4)
                     .build();
-            aprilTag.setDecimation(2.0f);
+            aprilTag.setDecimation(1.0f);
 
             visionPortal = new VisionPortal.Builder()
                     .setCamera(hardwareMap.get(WebcamName.class, "Webcam 1"))
