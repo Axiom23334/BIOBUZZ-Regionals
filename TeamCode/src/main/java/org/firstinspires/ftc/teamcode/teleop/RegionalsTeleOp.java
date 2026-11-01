@@ -17,7 +17,9 @@ import com.seattlesolvers.solverslib.controller.PIDFController;
 
 import org.firstinspires.ftc.robotcore.external.hardware.camera.BuiltinCameraDirection;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
+import org.firstinspires.ftc.teamcode.subsystems.ShooterSystem;
 import org.firstinspires.ftc.teamcode.subsystems.SwerveDrive;
+import org.firstinspires.ftc.teamcode.subsystems.TurretTracker;
 import org.firstinspires.ftc.teamcode.util.drivers.GoBildaPinpointDriver;
 import org.firstinspires.ftc.vision.VisionPortal;
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
@@ -46,13 +48,15 @@ public class RegionalsTeleOp extends LinearOpMode {
     private VisionPortal visionPortal;
 
     // Mechanism Motors & Servos
-    private DcMotorEx turretMotor;
     private DcMotorEx intakeMotor;
     private DcMotorEx transferMotor;
-    private DcMotorEx shooterMotor;
     private Servo flipper;
 
-    private Servo pitch;
+    // Dedicated Shooter System with velocity compensation via hood/pitch angle
+    private ShooterSystem shooterSystem;
+
+    // Dedicated Turret Tracker with Pinpoint Heading memory
+    private TurretTracker turretTracker;
 
     // Diffy drive tuning & readiness
     public static double kP1 = 0.7;
@@ -63,11 +67,6 @@ public class RegionalsTeleOp extends LinearOpMode {
     // Flipper servo positions
     public static double FLIPPER_DOWN = 0.0;
     public static double FLIPPER_UP = 1.0;
-
-    // Shooter PID (target 3500 RPM)
-    private final PIDFController shooterPid = new PIDFController(0.0008, 0, 0, 0.00025);
-    public static double SHOOTER_TICKS_PER_REV = 28.0;
-    public static double TARGET_SHOOTER_RPM = 3500.0;
 
     // State Machine States
     public enum RobotState {
@@ -89,6 +88,7 @@ public class RegionalsTeleOp extends LinearOpMode {
     private static final boolean BLUE_ALLIANCE = true;
 
     private double lastTagSpacing = 40;
+    private String lastDetectedCell = "NONE";
 
 
 
@@ -122,19 +122,21 @@ public class RegionalsTeleOp extends LinearOpMode {
         backLeftMotor = hardwareMap.get(DcMotorEx.class, "backLeftMotor");
 
         // Initialize Mechanism Hardware
-        turretMotor = hardwareMap.get(DcMotorEx.class, "turretMotor");
         intakeMotor = hardwareMap.get(DcMotorEx.class, "intakeMotor");
         transferMotor = hardwareMap.get(DcMotorEx.class, "transferMotor");
-        shooterMotor = hardwareMap.get(DcMotorEx.class, "shooterMotor");
         flipper = hardwareMap.get(Servo.class, "flipper");
 
-        pitch = hardwareMap.get(Servo.class, "pitch");
+        // Initialize Dedicated Shooter System (handles flywheel PID + velocity compensated pitch angle)
+        shooterSystem = new ShooterSystem(hardwareMap);
+
+        // Initialize Dedicated Turret Tracker (tracks vision & seamlessly falls back to Pinpoint heading)
+        turretTracker = new TurretTracker(hardwareMap);
+        turretTracker.setOdo(odo);
 
         transferMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
         telemetry.addLine("Initialized. Waiting for start...");
         telemetry.update();
-        double angle = 0;
 
         waitForStart();
         if (isStopRequested()) return;
@@ -142,36 +144,30 @@ public class RegionalsTeleOp extends LinearOpMode {
         stateTimer.reset();
 
         while (opModeIsActive()) {
+            double pixelErrorX = telemetryAprilTag(0);
+            double pixelY = telemetryAprilTag(1);
+
+            // Update Turret Tracker with vision error & odometry heading
+            double turretPower = turretTracker.update(pixelErrorX, lastDetectedCell);
+
             FtcDashboard dashboard = FtcDashboard.getInstance();
             TelemetryPacket packet = new TelemetryPacket();
-            packet.put("x", telemetryAprilTag(0));
-            packet.put("y", telemetryAprilTag(1));
-            packet.put("pos", turretMotor.getCurrentPosition());
-            if (telemetryAprilTag(0)!=-99999){
-                if ((turretMotor.getCurrentPosition()>=300)&&(telemetryAprilTag(0)>0)){
-                    turretMotor.setPower(telemetryAprilTag(0) * -0.0012);
-                } else if ((turretMotor.getCurrentPosition()<=-300)&&(telemetryAprilTag(0)<0)){
-                    turretMotor.setPower(telemetryAprilTag(0) * -0.0012);
-                } else if (abs(turretMotor.getCurrentPosition())<=300){
-                    turretMotor.setPower(telemetryAprilTag(0) * -0.0012);
-                } else{
-                    turretMotor.setPower(0);
-                }
-            } else {
-                turretMotor.setPower(0);
-            }
+            packet.put("x", pixelErrorX);
+            packet.put("y", pixelY);
+            packet.put("pos", turretTracker.getTurretPosition());
+            packet.put("turretPower", turretPower);
+            packet.put("pinpointAssisted", turretTracker.isPinpointAssisted());
             dashboard.sendTelemetryPacket(packet);
 
+            telemetry.addData("Turret Pos", "%.0f", turretTracker.getTurretPosition());
+            telemetry.addData("Turret Mode", turretTracker.isPinpointAssisted() ? "PINPOINT_HEADING" : (turretTracker.isTracking() ? "VISION" : "IDLE"));
 
-
+            // Manual base pitch adjustments
             if (gamepad1.a){
-                angle = angle + 0.001;
+                shooterSystem.adjustBasePitch(0.001);
             } else if (gamepad1.y){
-                angle = angle - 0.001;
+                shooterSystem.adjustBasePitch(-0.001);
             }
-
-            telemetry.addData("angle", angle);
-            pitch.setPosition(angle);
 
             // ------------------- 2. STATE TRANSITIONS (R1 / L1) -------------------
             boolean currentR1 = gamepad1.right_bumper;
@@ -203,20 +199,16 @@ public class RegionalsTeleOp extends LinearOpMode {
             lastDpadDown = currentDpadDown;
             lastDpadUp = currentDpadUp;
 
-            // ------------------- 4. MECHANISM CONTROL & STATE MACHINE -------------------
-            // Continuous shooter PID targeting 3500 RPM
+            // ------------------- 4. MECHANISM CONTROL & SHOOTER UPDATE -------------------
+            // Enable/disable flywheel via left trigger
+            shooterSystem.setEnabled(!gamepad1.left_trigger_pressed);
+            // update() executes flywheel PID & velocity-compensated hood/pitch servo angle
+            shooterSystem.update();
 
-            if (!gamepad1.left_trigger_pressed){
-                double currentTicksPerSec = shooterMotor.getVelocity();
-                double currentRPM = (-currentTicksPerSec * 60.0) / SHOOTER_TICKS_PER_REV;
-                shooterPid.setSetPoint(TARGET_SHOOTER_RPM);
-                double shooterPower = shooterPid.calculate(currentRPM);
-                shooterMotor.setPower(1);
-                telemetry.addData("Shooter RPM", "%.0f / %.0f", currentRPM, TARGET_SHOOTER_RPM);
-            } else{
-                shooterMotor.setPower(0);
-            }
-            telemetry.addData("angle", angle);
+            telemetry.addData("Shooter RPM", "%.0f / %.0f", shooterSystem.getCurrentRPM(), ShooterSystem.TARGET_RPM);
+            telemetry.addData("Base Pitch", "%.3f", shooterSystem.getBasePitch());
+            telemetry.addData("Compensated Pitch", "%.3f", shooterSystem.getCompensatedPitch());
+            telemetry.addData("RPM Error", "%.0f", shooterSystem.getRpmError());
 
             // State behaviors
             switch (currentState) {
@@ -289,8 +281,8 @@ public class RegionalsTeleOp extends LinearOpMode {
         backLeftMotor.setPower(0);
         intakeMotor.setPower(0);
         transferMotor.setPower(0);
-        shooterMotor.setPower(0);
-        turretMotor.setPower(0);
+        shooterSystem.stop();
+        turretTracker.stop();
     }
     private void initAprilTag() {
         // Create AprilTag processor configured with ThriftyCam / ThriftestCam lens intrinsics
@@ -417,6 +409,7 @@ public class RegionalsTeleOp extends LinearOpMode {
                         + (1.5 - averageIndex) * lastTagSpacing;
 
                 double centreY = sumY / count;
+                lastDetectedCell = audienceSide ? "AUDIENCE" : "FAR";
 
                 telemetry.addData("Alliance",
                         BLUE_ALLIANCE ? "BLUE" : "RED");
@@ -436,6 +429,16 @@ public class RegionalsTeleOp extends LinearOpMode {
                 telemetry.addData("Centre Y", centreY);
 
                 telemetry.addData("Tag Spacing", lastTagSpacing);
+
+                // --- 1x4 Horizontal AprilTag Line Regression ---
+                // Reconstructs center and calculates base hood position from the 1x4 cluster
+                // even when only a subset of tags (1..3) is visible
+                shooterSystem.updateClusterRegression(detections, targetClusterStart, lastTagSpacing);
+
+                telemetry.addData("Regression Active", shooterSystem.isRegressionActive());
+                telemetry.addData("Estimated Dist", "%.1f in", shooterSystem.getLastEstimatedDist());
+                telemetry.addData("Cluster Bearing", "%.1f deg", shooterSystem.getLastClusterBearing());
+                telemetry.addData("Cluster Yaw", "%.1f deg", shooterSystem.getLastClusterYaw());
 
                 if (num==0){
                     returnValue = 320-centreX;

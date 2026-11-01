@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode.auto;
 
+import android.util.Size;
 import com.pedropathing.follower.Follower;
 import com.pedropathing.geometry.BezierLine;
 import com.pedropathing.geometry.Pose;
@@ -10,9 +11,17 @@ import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.Range;
-import com.seattlesolvers.solverslib.controller.PIDFController;
 
+import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
 import org.firstinspires.ftc.teamcode.pedroPathing.Constants;
+import org.firstinspires.ftc.teamcode.subsystems.ShooterSystem;
+import org.firstinspires.ftc.teamcode.subsystems.TurretTracker;
+import org.firstinspires.ftc.teamcode.util.drivers.GoBildaPinpointDriver;
+import org.firstinspires.ftc.vision.VisionPortal;
+import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
+import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
+
+import java.util.List;
 
 @Autonomous(name = "Regionals Autonomous", group = "Comp")
 public class NewCommandAuto extends LinearOpMode {
@@ -20,22 +29,32 @@ public class NewCommandAuto extends LinearOpMode {
     // Follower & Odometry
     private Follower follower;
 
+    // Vision
+    private AprilTagProcessor aprilTag;
+    private VisionPortal visionPortal;
+
     // Mechanism Hardware
-    private DcMotorEx turretMotor;
     private DcMotorEx intakeMotor;
     private DcMotorEx transferMotor;
-    private DcMotorEx shooterMotor;
     private Servo flipper;
+
+    // Dedicated Shooter System with velocity compensation & regression
+    private ShooterSystem shooterSystem;
+
+    // Dedicated Turret Tracker
+    private TurretTracker turretTracker;
 
     // Flipper servo positions
     public static double FLIPPER_DOWN = 0.0;
     public static double FLIPPER_UP = 1.0;
     public static double FLIPPER_INTAKE = 0.5;
 
-    // Shooter PID (target 3500 RPM)
-    private final PIDFController shooterPid = new PIDFController(0.0008, 0.00005, 0.00001, 0.00025);
-    public static double SHOOTER_TICKS_PER_REV = 28.0;
-    public static double TARGET_SHOOTER_RPM = 3500.0;
+    // Default autonomous hood/pitch position fallback
+    public static double AUTO_BASE_PITCH = 0.45;
+
+    // Alliance configuration
+    private static final boolean BLUE_ALLIANCE = true;
+    private double lastTagSpacing = 40.0;
 
     // Autonomous Poses & Path
     private final Pose startPose = new Pose(9, 111, Math.toRadians(-90));
@@ -45,11 +64,23 @@ public class NewCommandAuto extends LinearOpMode {
     @Override
     public void runOpMode() throws InterruptedException {
         // Initialize Mechanism Hardware
-        turretMotor = hardwareMap.get(DcMotorEx.class, "turretMotor");
         intakeMotor = hardwareMap.get(DcMotorEx.class, "intakeMotor");
         transferMotor = hardwareMap.get(DcMotorEx.class, "transferMotor");
-        shooterMotor = hardwareMap.get(DcMotorEx.class, "shooterMotor");
         flipper = hardwareMap.get(Servo.class, "flipper");
+
+        // Initialize Shooter System with hood velocity compensation & regression
+        shooterSystem = new ShooterSystem(hardwareMap);
+        shooterSystem.setBasePitch(AUTO_BASE_PITCH);
+
+        // Initialize Turret Tracker with Pinpoint IMU (heading-only, pods not required)
+        turretTracker = new TurretTracker(hardwareMap);
+        try {
+            GoBildaPinpointDriver odo = hardwareMap.get(GoBildaPinpointDriver.class, "odo");
+            turretTracker.setOdo(odo);
+        } catch (Exception ignored) {}
+
+        // Initialize AprilTag vision for target detection during auto
+        initAprilTag();
 
         // Initialize Pedro Pathing follower
         follower = Constants.createFollower(hardwareMap);
@@ -70,7 +101,7 @@ public class NewCommandAuto extends LinearOpMode {
         follower.followPath(pathChain, true);
         while (opModeIsActive() && follower.isBusy()) {
             follower.update();
-            updateShooterPID();
+            updateVisionAndShooter();
             telemetryOutput();
         }
 
@@ -100,21 +131,11 @@ public class NewCommandAuto extends LinearOpMode {
         stopMechanisms();
     }
 
-    private void updateShooterPID() {
-        if (shooterMotor != null) {
-            double currentTicksPerSec = shooterMotor.getVelocity();
-            double currentRPM = (currentTicksPerSec * 60.0) / SHOOTER_TICKS_PER_REV;
-            shooterPid.setSetPoint(TARGET_SHOOTER_RPM);
-            double shooterPower = shooterPid.calculate(currentRPM);
-            shooterMotor.setPower(Range.clip(shooterPower, -1.0, 1.0));
-        }
-    }
-
     private void waitMillis(long ms) {
         ElapsedTime timer = new ElapsedTime();
         while (opModeIsActive() && timer.milliseconds() < ms) {
             follower.update();
-            updateShooterPID();
+            updateVisionAndShooter();
             telemetryOutput();
         }
     }
@@ -122,13 +143,89 @@ public class NewCommandAuto extends LinearOpMode {
     private void stopMechanisms() {
         intakeMotor.setPower(0);
         transferMotor.setPower(0);
-        shooterMotor.setPower(0);
-        turretMotor.setPower(0);
+        shooterSystem.stop();
+        turretTracker.stop();
+        if (visionPortal != null) {
+            visionPortal.close();
+        }
+    }
+
+    private void initAprilTag() {
+        aprilTag = new AprilTagProcessor.Builder()
+                .setLensIntrinsics(578.272, 578.272, 402.145, 221.506)
+                .setNumThreads(4)
+                .build();
+        aprilTag.setDecimation(2.0f);
+
+        visionPortal = new VisionPortal.Builder()
+                .setCamera(hardwareMap.get(WebcamName.class, "Webcam 1"))
+                .setCameraResolution(new Size(640, 480))
+                .setStreamFormat(VisionPortal.StreamFormat.MJPEG)
+                .addProcessor(aprilTag)
+                .build();
+    }
+
+    private void updateVisionAndShooter() {
+        double pixelErrorX = -99999;
+        String cell = "NONE";
+
+        if (aprilTag != null) {
+            List<AprilTagDetection> detections = aprilTag.getDetections();
+            int audienceStart = BLUE_ALLIANCE ? 38 : 34;
+            int farStart = BLUE_ALLIANCE ? 42 : 30;
+
+            int audienceCount = 0;
+            int farCount = 0;
+            for (AprilTagDetection detection : detections) {
+                if (detection.id >= audienceStart && detection.id <= audienceStart + 3) {
+                    audienceCount++;
+                } else if (detection.id >= farStart && detection.id <= farStart + 3) {
+                    farCount++;
+                }
+            }
+
+            boolean audienceSide = audienceCount >= farCount;
+            int targetClusterStart = audienceSide ? audienceStart : farStart;
+            cell = audienceSide ? "AUDIENCE" : "FAR";
+
+            shooterSystem.updateClusterRegression(detections, targetClusterStart, lastTagSpacing);
+            if (shooterSystem.getLastPerceivedSpacing() > 0) {
+                lastTagSpacing = shooterSystem.getLastPerceivedSpacing();
+            }
+
+            // Calculate pixel error for turret tracking
+            int count = audienceSide ? audienceCount : farCount;
+            if (count > 0) {
+                double sumX = 0;
+                double sumIndex = 0;
+                for (AprilTagDetection detection : detections) {
+                    int index = detection.id - targetClusterStart;
+                    if (index >= 0 && index <= 3) {
+                        sumX += detection.center.x;
+                        sumIndex += index;
+                    }
+                }
+                double avgIndex = sumIndex / count;
+                double centreX = (sumX / count) + (1.5 - avgIndex) * lastTagSpacing;
+                pixelErrorX = 320.0 - centreX;
+            }
+        }
+
+        // Update Turret Tracker with vision error & Pinpoint heading fallback
+        turretTracker.update(pixelErrorX, cell);
+
+        shooterSystem.update();
     }
 
     private void telemetryOutput() {
-        double currentRPM = (shooterMotor.getVelocity() * 60.0) / SHOOTER_TICKS_PER_REV;
-        telemetry.addData("Shooter RPM", "%.0f / %.0f", currentRPM, TARGET_SHOOTER_RPM);
+        telemetry.addData("Shooter RPM", "%.0f / %.0f", shooterSystem.getCurrentRPM(), ShooterSystem.TARGET_RPM);
+        telemetry.addData("Base Pitch", "%.3f", shooterSystem.getBasePitch());
+        telemetry.addData("Compensated Pitch", "%.3f", shooterSystem.getCompensatedPitch());
+        telemetry.addData("RPM Error", "%.0f", shooterSystem.getRpmError());
+        telemetry.addData("Regression Active", shooterSystem.isRegressionActive());
+        telemetry.addData("Estimated Dist", "%.1f in", shooterSystem.getLastEstimatedDist());
+        telemetry.addData("Cluster Bearing", "%.1f deg", shooterSystem.getLastClusterBearing());
+        telemetry.addData("Tag Spacing", "%.1f px", lastTagSpacing);
         telemetry.addData("Follower Busy", follower.isBusy());
         telemetry.addData("X", follower.getPose().getX());
         telemetry.addData("Y", follower.getPose().getY());
