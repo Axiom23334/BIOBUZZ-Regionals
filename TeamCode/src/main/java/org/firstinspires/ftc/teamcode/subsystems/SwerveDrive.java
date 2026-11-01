@@ -1,5 +1,7 @@
 package org.firstinspires.ftc.teamcode.subsystems;
 
+import com.acmerobotics.dashboard.FtcDashboard;
+import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 import com.qualcomm.robotcore.hardware.AnalogInput;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
@@ -207,6 +209,14 @@ public class SwerveDrive {
         telemetry.addData("Heading", heading);
         telemetry.addData("M1 Angle/Ref", "%.1f / %.1f", mod1P, mod1reference);
         telemetry.addData("M2 Angle/Ref", "%.1f / %.1f", mod2P, mod2reference);
+
+        FtcDashboard dashboard = FtcDashboard.getInstance();
+        TelemetryPacket packet = new TelemetryPacket();
+        packet.put("m1", mod1P);
+        packet.put("r1", mod1reference);
+        packet.put("m2", mod2P);
+        packet.put("r2", mod2reference);
+        dashboard.sendTelemetryPacket(packet);
     }
 
     private double readEncoder(myDcMotorEx enc, double offset) {

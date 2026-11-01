@@ -1,5 +1,7 @@
 package org.firstinspires.ftc.teamcode.teleop;
 
+import static java.lang.Math.abs;
+
 import android.util.Size;
 import com.acmerobotics.dashboard.FtcDashboard;
 import com.acmerobotics.dashboard.telemetry.MultipleTelemetry;
@@ -84,6 +86,10 @@ public class RegionalsTeleOp extends LinearOpMode {
     private boolean lastDpadDown = false;
     private boolean lastDpadUp = false;
 
+    private static final boolean BLUE_ALLIANCE = true;
+
+    private double lastTagSpacing = 40;
+
 
 
     @Override
@@ -136,8 +142,27 @@ public class RegionalsTeleOp extends LinearOpMode {
         stateTimer.reset();
 
         while (opModeIsActive()) {
+            FtcDashboard dashboard = FtcDashboard.getInstance();
+            TelemetryPacket packet = new TelemetryPacket();
+            packet.put("x", telemetryAprilTag(0));
+            packet.put("y", telemetryAprilTag(1));
+            packet.put("pos", turretMotor.getCurrentPosition());
+            if (telemetryAprilTag(0)!=-99999){
+                if ((turretMotor.getCurrentPosition()>=300)&&(telemetryAprilTag(0)>0)){
+                    turretMotor.setPower(telemetryAprilTag(0) * -0.0012);
+                } else if ((turretMotor.getCurrentPosition()<=-300)&&(telemetryAprilTag(0)<0)){
+                    turretMotor.setPower(telemetryAprilTag(0) * -0.0012);
+                } else if (abs(turretMotor.getCurrentPosition())<=300){
+                    turretMotor.setPower(telemetryAprilTag(0) * -0.0012);
+                } else{
+                    turretMotor.setPower(0);
+                }
+            } else {
+                turretMotor.setPower(0);
+            }
+            dashboard.sendTelemetryPacket(packet);
 
-            telemetryAprilTag();
+
 
             if (gamepad1.a){
                 angle = angle + 0.001;
@@ -186,7 +211,7 @@ public class RegionalsTeleOp extends LinearOpMode {
                 double currentRPM = (-currentTicksPerSec * 60.0) / SHOOTER_TICKS_PER_REV;
                 shooterPid.setSetPoint(TARGET_SHOOTER_RPM);
                 double shooterPower = shooterPid.calculate(currentRPM);
-                shooterMotor.setPower(Range.clip(shooterPower, -1.0, 1.0));
+                shooterMotor.setPower(1);
                 telemetry.addData("Shooter RPM", "%.0f / %.0f", currentRPM, TARGET_SHOOTER_RPM);
             } else{
                 shooterMotor.setPower(0);
@@ -295,25 +320,137 @@ public class RegionalsTeleOp extends LinearOpMode {
         visionPortal = builder.build();
     }
 
-    private void telemetryAprilTag() {
+    private double telemetryAprilTag(int num) {
+        double returnValue = -99999;
         if (visionPortal != null) {
             telemetry.addData("VisionPortal FPS", "%.1f", visionPortal.getFps());
         }
-        if (aprilTag != null) {
-            List<AprilTagDetection> currentDetections = aprilTag.getDetections();
-            telemetry.addData("# AprilTags Detected", currentDetections.size());
 
-            for (AprilTagDetection detection : currentDetections) {
-                if (detection.metadata != null) {
-                    telemetry.addLine(String.format("\n==== (ID %d) %s", detection.id, detection.metadata.name));
-                    telemetry.addLine(String.format("XYZ %6.1f %6.1f %6.1f  (inch)", detection.ftcPose.x, detection.ftcPose.y, detection.ftcPose.z));
-                    telemetry.addLine(String.format("PRY %6.1f %6.1f %6.1f  (deg)", detection.ftcPose.pitch, detection.ftcPose.roll, detection.ftcPose.yaw));
-                    telemetry.addLine(String.format("RBE %6.1f %6.1f %6.1f  (inch, deg, deg)", detection.ftcPose.range, detection.ftcPose.bearing, detection.ftcPose.elevation));
-                } else {
-                    telemetry.addLine(String.format("\n==== (ID %d) Unknown", detection.id));
-                    telemetry.addLine(String.format("Center %6.0f %6.0f   (pixels)", detection.center.x, detection.center.y));
+        if (aprilTag != null) {
+
+            List<AprilTagDetection> detections = aprilTag.getDetections();
+
+            // Determine ID ranges for the selected alliance
+            int audienceStart = BLUE_ALLIANCE ? 38 : 34;
+            int farStart = BLUE_ALLIANCE ? 42 : 30;
+
+            int audienceCount = 0;
+            int farCount = 0;
+
+            // Count tags belonging to each CELL
+            for (AprilTagDetection detection : detections) {
+
+                if (detection.id >= audienceStart &&
+                        detection.id <= audienceStart + 3) {
+
+                    audienceCount++;
+
+                } else if (detection.id >= farStart &&
+                        detection.id <= farStart + 3) {
+
+                    farCount++;
                 }
             }
+
+            // Automatically select the more likely CELL
+            boolean audienceSide = audienceCount >= farCount;
+
+            int targetClusterStart = audienceSide
+                    ? audienceStart : farStart;
+
+            int count = audienceSide ? audienceCount : farCount;
+
+            FtcDashboard dashboard = FtcDashboard.getInstance();
+            TelemetryPacket packet = new TelemetryPacket();
+
+            if (count > 0) {
+
+                double sumX = 0;
+                double sumY = 0;
+                double sumIndex = 0;
+
+                // Calculate the centre using only the selected cluster
+                for (AprilTagDetection detection : detections) {
+
+                    int index = detection.id - targetClusterStart;
+
+                    if (index >= 0 && index <= 3) {
+
+                        sumX += detection.center.x;
+                        sumY += detection.center.y;
+                        sumIndex += index;
+                    }
+                }
+
+                // Calculate spacing between visible tags
+                double sumSpacing = 0;
+                int pairs = 0;
+
+                for (AprilTagDetection a : detections) {
+
+                    int indexA = a.id - targetClusterStart;
+
+                    if (indexA < 0 || indexA > 3) continue;
+
+                    for (AprilTagDetection b : detections) {
+
+                        int indexB = b.id - targetClusterStart;
+
+                        if (indexB <= indexA || indexB > 3) continue;
+
+                        sumSpacing += (b.center.x - a.center.x)
+                                / (indexB - indexA);
+
+                        pairs++;
+                    }
+                }
+
+                // Update spacing when multiple tags are visible
+                if (pairs > 0) {
+                    lastTagSpacing = sumSpacing / pairs;
+                }
+
+                // Estimate centre of the complete four-tag row
+                double averageIndex = sumIndex / count;
+
+                double centreX = (sumX / count)
+                        + (1.5 - averageIndex) * lastTagSpacing;
+
+                double centreY = sumY / count;
+
+                telemetry.addData("Alliance",
+                        BLUE_ALLIANCE ? "BLUE" : "RED");
+
+                telemetry.addData("Selected CELL",
+                        audienceSide ? "AUDIENCE" : "FAR");
+
+                telemetry.addData("Audience Tags", audienceCount);
+                telemetry.addData("Far Tags", farCount);
+
+                telemetry.addData("Selected IDs",
+                        targetClusterStart + "-" + (targetClusterStart + 3));
+
+                telemetry.addData("Visible Tags", count);
+
+                telemetry.addData("Centre X", centreX);
+                telemetry.addData("Centre Y", centreY);
+
+                telemetry.addData("Tag Spacing", lastTagSpacing);
+
+                if (num==0){
+                    returnValue = 320-centreX;
+                } else if (num==1){
+                    returnValue = centreY;
+                }
+
+
+            } else {
+
+                telemetry.addData("Goal Centre", "No matching tags detected");
+            }
+
+            dashboard.sendTelemetryPacket(packet);
         }
+        return returnValue;
     }
 }
