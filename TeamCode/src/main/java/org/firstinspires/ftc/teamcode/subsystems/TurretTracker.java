@@ -22,6 +22,11 @@ public class TurretTracker {
     public static double TURRET_LIMIT_TICKS = 450.0; // 180 degrees left and right
     public static double DEAD_BAND_PIXELS = 2.5;     // Pixel error deadband
 
+    // User Tunable Turret Offset (in pixels or encoder ticks)
+    // Positive shifts aim to the left, negative shifts aim to the right
+    public static double TURRET_AIM_OFFSET_PIXELS = 0.0;
+    public static double TURRET_ENCODER_OFFSET_TICKS = 0.0;
+
     // Vision Control Gains (Primary Driver)
     // Note: pixelErrorX = 320 - centreX. positive pixelErrorX means target is LEFT.
     // Negative motor power rotates turret LEFT on this robot hardware.
@@ -83,7 +88,7 @@ public class TurretTracker {
             double rawDeg = Math.toDegrees(rawRad);
             if (Double.isNaN(rawDeg)) return Double.NaN;
             currentBotHeading = AngleUnit.normalizeDegrees(rawDeg * SwerveTeleOpConfig.IMU_POLARITY);
-            return currentBotHeading;
+            return -currentBotHeading;
         } catch (Exception e) {
             return Double.NaN;
         }
@@ -99,7 +104,7 @@ public class TurretTracker {
     public double update(double pixelErrorX, String cell) {
         double botHeading = updateHeadingFromPinpoint();
         boolean pinpointAvailable = !Double.isNaN(botHeading);
-        double currentTicks = turretMotor.getCurrentPosition();
+        double currentTicks = turretMotor.getCurrentPosition() - TURRET_ENCODER_OFFSET_TICKS;
         double currentVelocity = turretMotor.getVelocity(); // ticks/second
 
         double dt = dtTimer.seconds();
@@ -120,17 +125,20 @@ public class TurretTracker {
         double power = 0.0;
 
         if (pixelErrorX != -99999) {
+            // Apply tunable user aim offset to vision pixel error
+            double adjustedErrorX = pixelErrorX + TURRET_AIM_OFFSET_PIXELS;
+
             // =================================================================
             // CASE 1: VISION IS ACTIVE
             // =================================================================
-            if (hasTarget && Math.abs(pixelErrorX - filteredPixelError) > MAX_ALLOWED_PIXEL_JUMP && Math.abs(filteredPixelError) > 0.1) {
-                pixelErrorX = filteredPixelError + Math.signum(pixelErrorX - filteredPixelError) * MAX_ALLOWED_PIXEL_JUMP;
+            if (hasTarget && Math.abs(adjustedErrorX - filteredPixelError) > MAX_ALLOWED_PIXEL_JUMP && Math.abs(filteredPixelError) > 0.1) {
+                adjustedErrorX = filteredPixelError + Math.signum(adjustedErrorX - filteredPixelError) * MAX_ALLOWED_PIXEL_JUMP;
             }
 
             if (!hasTarget) {
-                filteredPixelError = pixelErrorX;
+                filteredPixelError = adjustedErrorX;
             } else {
-                filteredPixelError = (FILTER_ALPHA * filteredPixelError) + ((1.0 - FILTER_ALPHA) * pixelErrorX);
+                filteredPixelError = (FILTER_ALPHA * filteredPixelError) + ((1.0 - FILTER_ALPHA) * adjustedErrorX);
             }
 
             hasTarget = true;
@@ -220,6 +228,26 @@ public class TurretTracker {
         trackerState = "STOPPED";
     }
 
+    public void setAimOffsetPixels(double offsetPx) {
+        TURRET_AIM_OFFSET_PIXELS = offsetPx;
+    }
+
+    public void adjustAimOffsetPixels(double deltaPx) {
+        TURRET_AIM_OFFSET_PIXELS += deltaPx;
+    }
+
+    public double getAimOffsetPixels() {
+        return TURRET_AIM_OFFSET_PIXELS;
+    }
+
+    public void setEncoderOffsetTicks(double offsetTicks) {
+        TURRET_ENCODER_OFFSET_TICKS = offsetTicks;
+    }
+
+    public double getEncoderOffsetTicks() {
+        return TURRET_ENCODER_OFFSET_TICKS;
+    }
+
     public boolean isTracking() {
         return hasTarget;
     }
@@ -233,6 +261,10 @@ public class TurretTracker {
     }
 
     public double getTurretPosition() {
+        return turretMotor.getCurrentPosition() - TURRET_ENCODER_OFFSET_TICKS;
+    }
+
+    public double getRawTurretPosition() {
         return turretMotor.getCurrentPosition();
     }
 

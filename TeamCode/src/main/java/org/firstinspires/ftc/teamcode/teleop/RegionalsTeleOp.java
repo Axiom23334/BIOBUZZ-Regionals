@@ -206,9 +206,10 @@ public class RegionalsTeleOp extends LinearOpMode {
             // update() executes flywheel PID & velocity-compensated hood/pitch servo angle
             shooterSystem.update();
 
-            telemetry.addData("Shooter RPM", "%.0f / %.0f", shooterSystem.getCurrentRPM(), ShooterSystem.TARGET_RPM);
+            telemetry.addData("Shooter RPM", "%.0f / %.0f", shooterSystem.getCurrentRPM(), shooterSystem.getActiveTargetRPM());
             telemetry.addData("Base Pitch", "%.3f", shooterSystem.getBasePitch());
             telemetry.addData("Compensated Pitch", "%.3f", shooterSystem.getCompensatedPitch());
+            telemetry.addData("Turret Offset", "%.1f px", turretTracker.getAimOffsetPixels());
             telemetry.addData("RPM Error", "%.0f", shooterSystem.getRpmError());
 
             // State behaviors

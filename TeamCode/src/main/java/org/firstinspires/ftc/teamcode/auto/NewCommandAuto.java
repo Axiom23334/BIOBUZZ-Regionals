@@ -193,21 +193,9 @@ public class NewCommandAuto extends LinearOpMode {
                 lastTagSpacing = shooterSystem.getLastPerceivedSpacing();
             }
 
-            // Calculate pixel error for turret tracking
-            int count = audienceSide ? audienceCount : farCount;
-            if (count > 0) {
-                double sumX = 0;
-                double sumIndex = 0;
-                for (AprilTagDetection detection : detections) {
-                    int index = detection.id - targetClusterStart;
-                    if (index >= 0 && index <= 3) {
-                        sumX += detection.center.x;
-                        sumIndex += index;
-                    }
-                }
-                double avgIndex = sumIndex / count;
-                double centreX = (sumX / count) + (1.5 - avgIndex) * lastTagSpacing;
-                pixelErrorX = 320.0 - centreX;
+            // Robust centrepoint from ShooterSystem's cluster geometry solver
+            if (shooterSystem.getLastCentreX() > 0) {
+                pixelErrorX = 320.0 - shooterSystem.getLastCentreX();
             }
         }
 
