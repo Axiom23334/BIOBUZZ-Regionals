@@ -1,4 +1,4 @@
-# FTC Control Award Submission: 2-Dimensional Aim & Shot Ballistics
+   # FTC Control Award Submission: 2-Dimensional Aim & Shot Ballistics
 
 **Team:** BIOBUZZ Regionals  
 **System:** Autonomous & TeleOp Turret Tracking & 2D Ballistic Regression  

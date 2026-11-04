@@ -31,9 +31,9 @@ public class ShooterSystem {
     // =========================================================================
 
     // Optical geometry constants for ThriftyCam (640x480)
-    public static double FOCAL_LENGTH_PX = 578.272;            // ThriftyCam calibrated focal length
+    public static double FOCAL_LENGTH_PX = 578.272;           // ThriftyCam calibrated focal length
     public static double PHYSICAL_TAG_SPACING_INCHES = 6.0;   // Physical spacing between adjacent tag centers in 1x4 line
-    public static double REFERENCE_TAG_SPACING_PX = 72.0;      // Nominal pixel spacing at ~48 inches
+    public static double REFERENCE_TAG_SPACING_PX = 72.0;     // Nominal pixel spacing at ~48 inches
 
     // --- Dimension 1: Hood Pitch Regression Tuning ---
     public static double HOOD_INTERCEPT = 0.38;          // Base hood offset
