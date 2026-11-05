@@ -18,6 +18,7 @@ import com.seattlesolvers.solverslib.controller.PIDFController;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.BuiltinCameraDirection;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
 import org.firstinspires.ftc.teamcode.subsystems.SwerveDrive;
+import org.firstinspires.ftc.teamcode.subsystems.TurretTracker;
 import org.firstinspires.ftc.teamcode.util.drivers.GoBildaPinpointDriver;
 import org.firstinspires.ftc.vision.VisionPortal;
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
@@ -54,6 +55,8 @@ public class RegionalsTeleOp extends LinearOpMode {
 
     private Servo pitch;
 
+    private TurretTracker turretTracker;
+
     // Diffy drive tuning & readiness
     public static double kP1 = 0.7;
     public static double kP2 = 0.7;
@@ -87,9 +90,14 @@ public class RegionalsTeleOp extends LinearOpMode {
     private boolean lastDpadDown = false;
     private boolean lastDpadUp = false;
 
-    private static final boolean BLUE_ALLIANCE = true;
+    protected boolean isBlueAlliance = true;
+
+    public void setAlliance(boolean isBlue) {
+        this.isBlueAlliance = isBlue;
+    }
 
     private double lastTagSpacing = 40;
+    private String lastDetectedCell = "NONE";
 
 
 
@@ -131,6 +139,12 @@ public class RegionalsTeleOp extends LinearOpMode {
 
         pitch = hardwareMap.get(Servo.class, "pitch");
 
+        // Initialize Turret Tracker
+        turretTracker = new TurretTracker(hardwareMap);
+        if (odo != null) {
+            turretTracker.setOdo(odo);
+        }
+
         transferMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
         telemetry.addLine("Initialized. Waiting for start...");
@@ -143,39 +157,36 @@ public class RegionalsTeleOp extends LinearOpMode {
         stateTimer.reset();
 
         while (opModeIsActive()) {
+            double pixelErrorX = telemetryAprilTag(0);
+            double pixelY = telemetryAprilTag(1);
+
+            // Update Turret Tracker with vision error & Pinpoint heading
+            double turretPower = turretTracker.update(pixelErrorX, lastDetectedCell);
+
             FtcDashboard dashboard = FtcDashboard.getInstance();
             TelemetryPacket packet = new TelemetryPacket();
-            packet.put("x", telemetryAprilTag(0));
-            packet.put("y", telemetryAprilTag(1));
-            if (telemetryAprilTag(0)!=-99999){
-                if ((turretMotor.getCurrentPosition()>=300)&&(telemetryAprilTag(0)>0)){
-                    turretMotor.setPower(telemetryAprilTag(0) * -0.0012);
-                } else if ((turretMotor.getCurrentPosition()<=-300)&&(telemetryAprilTag(0)<0)){
-                    turretMotor.setPower(telemetryAprilTag(0) * -0.0012);
-                } else if (abs(turretMotor.getCurrentPosition())<=300){
-                    turretMotor.setPower(telemetryAprilTag(0) * -0.0012);
-                } else{
-                    turretMotor.setPower(0);
-                }
-            } else {
-                turretMotor.setPower(0);
-            }
+            packet.put("x", pixelErrorX);
+            packet.put("y", pixelY);
+            packet.put("pos", turretTracker.getTurretPosition());
+            packet.put("turretPower", turretPower);
+            packet.put("trackerState", turretTracker.getTrackerState());
             dashboard.sendTelemetryPacket(packet);
 
-
+            telemetry.addData("Turret Pos", "%.0f", turretTracker.getTurretPosition());
+            telemetry.addData("Turret Mode", turretTracker.getTrackerState());
 
             if (gamepad1.a){
                 angle = angle + 0.001;
             } else if (gamepad1.y){
                 angle = angle - 0.001;
             }
-            if (telemetryAprilTag(0)!=-99999) {
-                angle = 0.0022 * telemetryAprilTag(1) + 0.0643;
+            if (pixelErrorX != -99999) {
+                angle = 0.0022 * pixelY + 0.0643;
             }
 
             telemetry.addData("angle", angle);
-            telemetry.addData("x", telemetryAprilTag(0));
-            telemetry.addData("y", telemetryAprilTag(1));
+            telemetry.addData("x", pixelErrorX);
+            telemetry.addData("y", pixelY);
             pitch.setPosition(angle);
 
             // ------------------- 2. STATE TRANSITIONS (R1 / L1) -------------------
@@ -299,7 +310,8 @@ public class RegionalsTeleOp extends LinearOpMode {
         intakeMotor.setPower(0);
         transferMotor.setPower(0);
         shooterMotor.setPower(0);
-        turretMotor.setPower(0);
+        if (turretTracker != null) turretTracker.stop();
+        else turretMotor.setPower(0);
     }
     private void initAprilTag() {
         // Create AprilTag processor configured with ThriftyCam / ThriftestCam lens intrinsics
@@ -339,12 +351,14 @@ public class RegionalsTeleOp extends LinearOpMode {
 
             List<AprilTagDetection> detections = aprilTag.getDetections();
 
-            // Determine ID ranges for the selected alliance
-            int audienceStart = BLUE_ALLIANCE ? 38 : 34;
-            int farStart = BLUE_ALLIANCE ? 42 : 30;
+            // AprilTag ID ranges:
+            // BLUE AUDIENCE: 38-39-40-41 (start 38) | BLUE SCORING: 42-43-44-45 (start 42)
+            // RED SCORING:   30-31-32-33 (start 30) | RED AUDIENCE: 34-35-36-37 (start 34)
+            int audienceStart = isBlueAlliance ? 38 : 34;
+            int scoringStart  = isBlueAlliance ? 42 : 30;
 
             int audienceCount = 0;
-            int farCount = 0;
+            int scoringCount = 0;
 
             // Count tags belonging to each CELL
             for (AprilTagDetection detection : detections) {
@@ -354,20 +368,20 @@ public class RegionalsTeleOp extends LinearOpMode {
 
                     audienceCount++;
 
-                } else if (detection.id >= farStart &&
-                        detection.id <= farStart + 3) {
+                } else if (detection.id >= scoringStart &&
+                        detection.id <= scoringStart + 3) {
 
-                    farCount++;
+                    scoringCount++;
                 }
             }
 
             // Automatically select the more likely CELL
-            boolean audienceSide = audienceCount >= farCount;
+            boolean audienceSide = audienceCount >= scoringCount;
 
             int targetClusterStart = audienceSide
-                    ? audienceStart : farStart;
+                    ? audienceStart : scoringStart;
 
-            int count = audienceSide ? audienceCount : farCount;
+            int count = audienceSide ? audienceCount : scoringCount;
 
             FtcDashboard dashboard = FtcDashboard.getInstance();
             TelemetryPacket packet = new TelemetryPacket();
@@ -426,6 +440,7 @@ public class RegionalsTeleOp extends LinearOpMode {
                         + (1.5 - averageIndex) * lastTagSpacing;
 
                 double centreY = sumY / count;
+                lastDetectedCell = audienceSide ? "AUDIENCE" : "SCORING";
 
                 /*telemetry.addData("Alliance",
                         BLUE_ALLIANCE ? "BLUE" : "RED");
