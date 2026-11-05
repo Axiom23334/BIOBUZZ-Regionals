@@ -8,7 +8,7 @@ public class SwerveTeleOpConfig {
     // =========================================================
     // 1. PID COEFFICIENTS (Edit these live to tune holding power)
     // =========================================================
-    public static double Kp = 0.06;
+    public static double Kp = 0.16;
     public static double Kd = 0.0;
     public static double Ki = 0; // Usually 0 for drive modules
     public static double Kf = 0;
@@ -44,11 +44,11 @@ public class SwerveTeleOpConfig {
     // Example: if facing driver and translation is mirrored, try +90 or -90.
     public static double HEADING_FRAME_OFFSET_DEG = 0.0;
 
-    public static double HEADING_LOCK_KP = 0.017;
+    public static double HEADING_LOCK_KP = 0.09;
     public static double HEADING_LOCK_KI = 0.00000;
-    public static double HEADING_LOCK_KD = 0.0001;
+    public static double HEADING_LOCK_KD = 0.001;
     public static  double HEADING_LOCK_KF = 0.00000;
     public static  double HEADING_LOCK_KL = 0.0;
-    public static double HEADING_LOCK_DEADBAND = 0.2;
+    public static double HEADING_LOCK_DEADBAND = 0.02;
     public static double P = 0.0008;
 }

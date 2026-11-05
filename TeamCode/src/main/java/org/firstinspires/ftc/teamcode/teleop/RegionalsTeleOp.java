@@ -65,11 +65,12 @@ public class RegionalsTeleOp extends LinearOpMode {
     public static double FLIPPER_UP = 1.0;
 
     // Shooter PID (target 3500 RPM)
-    private final PIDFController shooterPid = new PIDFController(0.0008, 0, 0, 0.00025);
+    private final PIDFController shooterPid = new PIDFController(0.00481, 0, 0, 0.00026);
     public static double SHOOTER_TICKS_PER_REV = 28.0;
-    public static double TARGET_SHOOTER_RPM = 3500.0;
+    public static double TARGET_SHOOTER_RPM = 2100;
 
     // State Machine States
+
     public enum RobotState {
         INTAKING,
         IDLE,
@@ -146,7 +147,6 @@ public class RegionalsTeleOp extends LinearOpMode {
             TelemetryPacket packet = new TelemetryPacket();
             packet.put("x", telemetryAprilTag(0));
             packet.put("y", telemetryAprilTag(1));
-            packet.put("pos", turretMotor.getCurrentPosition());
             if (telemetryAprilTag(0)!=-99999){
                 if ((turretMotor.getCurrentPosition()>=300)&&(telemetryAprilTag(0)>0)){
                     turretMotor.setPower(telemetryAprilTag(0) * -0.0012);
@@ -169,8 +169,13 @@ public class RegionalsTeleOp extends LinearOpMode {
             } else if (gamepad1.y){
                 angle = angle - 0.001;
             }
+            if (telemetryAprilTag(0)!=-99999) {
+                angle = 0.0022 * telemetryAprilTag(1) + 0.0643;
+            }
 
             telemetry.addData("angle", angle);
+            telemetry.addData("x", telemetryAprilTag(0));
+            telemetry.addData("y", telemetryAprilTag(1));
             pitch.setPosition(angle);
 
             // ------------------- 2. STATE TRANSITIONS (R1 / L1) -------------------
@@ -189,19 +194,19 @@ public class RegionalsTeleOp extends LinearOpMode {
                 stateTimer.reset();
             }
 
-            // ------------------- 3. MANUAL FLIPPER CONTROLS -------------------
-            boolean currentDpadDown = gamepad1.dpad_down;
-            boolean currentDpadUp = gamepad1.dpad_up;
 
-            if (currentDpadDown && !lastDpadDown) {
-                flipper.setPosition(FLIPPER_DOWN);
+            if (gamepad1.dpad_down) {
+                TARGET_SHOOTER_RPM = TARGET_SHOOTER_RPM - 100;
             }
-            if (currentDpadUp && !lastDpadUp) {
-                flipper.setPosition(FLIPPER_UP);
+            if (gamepad1.dpad_up) {
+                TARGET_SHOOTER_RPM = TARGET_SHOOTER_RPM + 100;
             }
-
-            lastDpadDown = currentDpadDown;
-            lastDpadUp = currentDpadUp;
+            if (gamepad1.dpad_left) {
+                TARGET_SHOOTER_RPM = TARGET_SHOOTER_RPM - 50;
+            }
+            if (gamepad1.dpad_right) {
+                TARGET_SHOOTER_RPM = TARGET_SHOOTER_RPM + 50;
+            }
 
             // ------------------- 4. MECHANISM CONTROL & STATE MACHINE -------------------
             // Continuous shooter PID targeting 3500 RPM
@@ -211,12 +216,16 @@ public class RegionalsTeleOp extends LinearOpMode {
                 double currentRPM = (-currentTicksPerSec * 60.0) / SHOOTER_TICKS_PER_REV;
                 shooterPid.setSetPoint(TARGET_SHOOTER_RPM);
                 double shooterPower = shooterPid.calculate(currentRPM);
-                shooterMotor.setPower(1);
-                telemetry.addData("Shooter RPM", "%.0f / %.0f", currentRPM, TARGET_SHOOTER_RPM);
+                shooterMotor.setPower(shooterPower);
+                //telemetry.addData("Shooter RPM", "%.0f / %.0f", currentRPM, TARGET_SHOOTER_RPM);
             } else{
                 shooterMotor.setPower(0);
             }
             telemetry.addData("angle", angle);
+            double currentTicksPerSec = shooterMotor.getVelocity();
+            double currentRPM = (-currentTicksPerSec * 60.0) / SHOOTER_TICKS_PER_REV;
+            telemetry.addData("Shooter RPM", "%.0f / %.0f", currentRPM, TARGET_SHOOTER_RPM);
+            telemetry.update();
 
             // State behaviors
             switch (currentState) {
@@ -299,8 +308,8 @@ public class RegionalsTeleOp extends LinearOpMode {
                 .setNumThreads(4)                                      // Parallel processing for fast detection
                 .build();
 
-        // Set decimation to 2.0f for higher speed and range accuracy
-        aprilTag.setDecimation(2.0f);
+
+        aprilTag.setDecimation(1.0f);
 
         VisionPortal.Builder builder = new VisionPortal.Builder();
 
@@ -323,7 +332,7 @@ public class RegionalsTeleOp extends LinearOpMode {
     private double telemetryAprilTag(int num) {
         double returnValue = -99999;
         if (visionPortal != null) {
-            telemetry.addData("VisionPortal FPS", "%.1f", visionPortal.getFps());
+            //telemetry.addData("VisionPortal FPS", "%.1f", visionPortal.getFps());
         }
 
         if (aprilTag != null) {
@@ -418,7 +427,7 @@ public class RegionalsTeleOp extends LinearOpMode {
 
                 double centreY = sumY / count;
 
-                telemetry.addData("Alliance",
+                /*telemetry.addData("Alliance",
                         BLUE_ALLIANCE ? "BLUE" : "RED");
 
                 telemetry.addData("Selected CELL",
@@ -435,7 +444,8 @@ public class RegionalsTeleOp extends LinearOpMode {
                 telemetry.addData("Centre X", centreX);
                 telemetry.addData("Centre Y", centreY);
 
-                telemetry.addData("Tag Spacing", lastTagSpacing);
+                telemetry.addData("Tag Spacing", lastTagSpacing);*/
+
 
                 if (num==0){
                     returnValue = 320-centreX;
@@ -446,7 +456,6 @@ public class RegionalsTeleOp extends LinearOpMode {
 
             } else {
 
-                telemetry.addData("Goal Centre", "No matching tags detected");
             }
 
             dashboard.sendTelemetryPacket(packet);
