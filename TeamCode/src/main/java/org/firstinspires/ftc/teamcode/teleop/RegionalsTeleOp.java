@@ -17,6 +17,7 @@ import com.seattlesolvers.solverslib.controller.PIDFController;
 
 import org.firstinspires.ftc.robotcore.external.hardware.camera.BuiltinCameraDirection;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
+import org.firstinspires.ftc.teamcode.maths.KalmanFilter;
 import org.firstinspires.ftc.teamcode.subsystems.SwerveDrive;
 import org.firstinspires.ftc.teamcode.subsystems.TurretTracker;
 import org.firstinspires.ftc.teamcode.util.drivers.GoBildaPinpointDriver;
@@ -98,6 +99,11 @@ public class RegionalsTeleOp extends LinearOpMode {
 
     private double lastTagSpacing = 40;
     private String lastDetectedCell = "NONE";
+
+    // Kalman filter parameters on sensor input (raw AprilTag pixel Y measurement)
+    public static double KALMAN_SENSOR_Q = 0.08; // Process noise (responsiveness to true robot motion)
+    public static double KALMAN_SENSOR_R = 12.0; // Measurement noise (rejection of optical sensor noise)
+    private final KalmanFilter sensorKalmanFilterY = new KalmanFilter(KALMAN_SENSOR_Q, KALMAN_SENSOR_R);
 
 
 
@@ -182,12 +188,21 @@ public class RegionalsTeleOp extends LinearOpMode {
                 angle = angle - 0.001;
             }
             if (pixelErrorX != -99999) {
-                angle = 0.0022 * pixelY + 0.0643;
+                // 1. Pass raw sensor Y into the Kalman filter first
+                sensorKalmanFilterY.setParameters(KALMAN_SENSOR_Q, KALMAN_SENSOR_R);
+                double filteredY = sensorKalmanFilterY.update(pixelY);
+
+                // 2. Use the filtered sensor measurement to compute the regression
+                angle = 0.0022 * filteredY + 0.0643;
+
+                telemetry.addData("raw Y", "%.1f", pixelY);
+                telemetry.addData("filtered Y", "%.1f", filteredY);
+            } else {
+                sensorKalmanFilterY.reset();
             }
 
             telemetry.addData("angle", angle);
             telemetry.addData("x", pixelErrorX);
-            telemetry.addData("y", pixelY);
             pitch.setPosition(angle);
 
             // ------------------- 2. STATE TRANSITIONS (R1 / L1) -------------------
