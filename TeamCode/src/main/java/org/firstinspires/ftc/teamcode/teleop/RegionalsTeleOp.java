@@ -147,6 +147,7 @@ public class RegionalsTeleOp extends LinearOpMode {
 
         transferMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
+
         telemetry.addLine("Initialized. Waiting for start...");
         telemetry.update();
         double angle = 0;
@@ -255,7 +256,8 @@ public class RegionalsTeleOp extends LinearOpMode {
                 case SHOOTING:
                     // On shooting: run both intake and transfer to feed shooter
                     intakeMotor.setPower(1.0);
-                    transferMotor.setPower(1.0);
+                    transferMotor.setVelocity(300*145.1);
+
                     break;
             }
             odo.update(GoBildaPinpointDriver.readData.ONLY_UPDATE_HEADING);
